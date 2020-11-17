@@ -38,7 +38,7 @@ async function listStates(stateFilter) {
         if (stateFilter) {
           return nextAcc;
         }
-        stateAcc = { results: [], stateCode };
+        stateAcc = { results: [], electoralAreaCode: stateCode };
         nextAcc[stateCode] = stateAcc;
       }
       // console.log(stateResult.results);
@@ -75,7 +75,7 @@ async function listStates(stateFilter) {
     });
     return nextAcc;
   }, Promise.resolve((stateFilter || []).reduce((acc, stateCode) => {
-    acc[stateCode] = { results: [], stateCode };
+    acc[stateCode] = { results: [], electoralAreaCode: stateCode };
     return acc;
   }, {})));
   console.log(JSON.stringify({ stateResults: Object.values(trackChangeStateData) }));
