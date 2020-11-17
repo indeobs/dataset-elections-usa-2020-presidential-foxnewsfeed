@@ -22,7 +22,7 @@ github@indeobs.com
 Node.js scripts are available that show how to generate json from the raw data.
 
 ```
-node node/extract-processingballot-by-state-by-day.js
+node node/extract-processingballot-timeseries-by-electoral-area.js
 ```
 
 Scripts from other data processing languages (R, Julia, python, ...) are welcomed to be integrated in the project.

@@ -8,6 +8,7 @@ const rawDataDir = 'feeds-elections.foxnews.com/archive/politics/elections/2020/
 
 async function listStates(stateFilter) {
   const regfile = /(....)(..)(..)T(..)(..)(..)Z\.json.gz/;
+  let tempByArea = {}
 
   const fileMetadatas = (await fsPromises
     .readdir(rawDataDir))
@@ -18,7 +19,7 @@ async function listStates(stateFilter) {
       return acc;
     }, []);
   let candidatesByNpid;
-  const trackChangeStateData = await fileMetadatas.reduce(async (acc, fileMetadata) => {
+  const timeserieInElectoralAreaByElectoralArea = await fileMetadatas.reduce(async (acc, fileMetadata) => {
     const nextAcc = await acc;
     const data = await fsPromises.readFile(`${rawDataDir}/${fileMetadata.filename}`)
       .then(gunzip)
@@ -38,9 +39,20 @@ async function listStates(stateFilter) {
         if (stateFilter) {
           return nextAcc;
         }
-        stateAcc = { results: [], electoralAreaCode: stateCode };
+        stateAcc = { timeserie: [], electoralAreaCode: stateCode, metricsDesc: [] };
         nextAcc[stateCode] = stateAcc;
+        let idx = 0;
+        tempByArea[stateCode] = {
+          candidateOrderInStateByNpid: stateResult.results.reduce((acc, result) => {
+            stateAcc.metricsDesc.push(candidatesByNpid[result.candidateNpid])
+            acc[result.candidateNpid] = idx;
+            idx += 1
+            return acc;
+          }, {})
+        }
+       // console.log(stateCode, tempByArea[stateCode], stateAcc)
       }
+      const { candidateOrderInStateByNpid } = tempByArea[stateCode];
       // console.log(stateResult.results);
       /* check if we're not missing some changes by just looking at the precinctsReporting value
       ... so some changes are missed if we just look at the precinctsReporting value
@@ -55,30 +67,27 @@ async function listStates(stateFilter) {
       }
       */
 
-      const lastStateVoteCounts = (stateAcc.results.length === 0)
+      const lastStateMetrics = (stateAcc.timeserie.length === 0)
         ? undefined
-        : stateAcc.results[stateAcc.results.length - 1].voteCounts;
-      if (stateAcc.results.length === 0 ||
-        stateResult.results.some((result) => result.votes.count !== lastStateVoteCounts[candidatesByNpid[result.candidateNpid].lastName])) {
-        stateAcc.results.push({
+        : stateAcc.timeserie[stateAcc.timeserie.length - 1].metrics;
+      if (stateAcc.timeserie.length === 0 ||
+        stateResult.results.some((result) => result.votes.count !== lastStateMetrics[candidateOrderInStateByNpid[result.candidateNpid]])) {
+        stateAcc.timeserie.push({
           // fileMetadata,
-          ts: fileMetadata.ts,
+          ts: fileMetadata.ts / 1000,
           // precinctsReporting: stateResult.precinctsReporting,
           // expectedPercentage: stateResult.expectedPercentage,
-          voteCounts: stateResult.results.reduce((acc, result) => {
-            acc[candidatesByNpid[result.candidateNpid].lastName] = result.votes.count;
+          metrics: stateResult.results.reduce((acc, result) => {
+            acc[candidateOrderInStateByNpid[result.candidateNpid]] = result.votes.count;
             return acc;
-          }, {}),
+          }, []),
         });
         stateAcc.availableDelegates = stateResult.availableDelegates;
       }
     });
     return nextAcc;
-  }, Promise.resolve((stateFilter || []).reduce((acc, stateCode) => {
-    acc[stateCode] = { results: [], electoralAreaCode: stateCode };
-    return acc;
-  }, {})));
-  console.log(JSON.stringify({ stateResults: Object.values(trackChangeStateData) }));
+  }, Promise.resolve({}));
+  console.log(JSON.stringify(Object.values(timeserieInElectoralAreaByElectoralArea)));
 }
 
 const stateFilter = process.argv.length < 3 ? undefined : process.argv[2].split(',')
